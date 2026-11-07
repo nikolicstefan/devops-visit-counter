@@ -73,7 +73,8 @@ wsl_version() {
 
     if ! output="$(
         powershell.exe -NoProfile -NonInteractive \
-            -Command 'wsl.exe --version' 2>&1
+            -Command 'wsl.exe --version' 2>&1 |
+            tr -d '\000'
     )"; then
         printf 'Not available'
         return

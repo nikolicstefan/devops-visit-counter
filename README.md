@@ -56,7 +56,10 @@ shellcheck --version
 | GNU Make | 4.3 |
 | uv | 0.12.22 |
 | ShellCheck | 0.8.0 |
+| Project Python | 3.13.16 |
 <!-- END AUTO-GENERATED: development-versions -->
+
+
 
 
 
@@ -102,6 +105,8 @@ docker desktop version
 | Docker Engine | 29.9.2 |
 | Docker Compose | 5.6.1 |
 <!-- END AUTO-GENERATED: runtime-versions -->
+
+
 
 
 

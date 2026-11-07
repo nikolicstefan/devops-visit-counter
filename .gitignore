@@ -1,0 +1,11 @@
+# IDE
+.vscode/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Python Tooling
+.ruff_cache/
+.mypy_cache/

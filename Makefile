@@ -9,7 +9,8 @@ MYPY := uv run mypy
 	tidy \
 	tidy-imp \
 	run \
-	test
+	test \
+	pytest
 
 shellcheck:
 	@test -n $(SCRIPT) || { \
@@ -47,3 +48,6 @@ run:
 
 test:
 	curl http://127.0.0.1:8000/
+
+pytest:
+	uv run python -m pytest

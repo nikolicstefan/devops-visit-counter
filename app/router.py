@@ -1,4 +1,4 @@
-from socket import gethostname
+import socket
 
 from fastapi import APIRouter
 
@@ -9,5 +9,5 @@ router = APIRouter()
 def index() -> dict[str, str]:
     return {
         "message": "Hello DevOps",
-        "host": gethostname(),
+        "host": socket.gethostname(),
     }

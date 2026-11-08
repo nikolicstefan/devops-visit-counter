@@ -165,6 +165,11 @@ shellcheck_version() {
     fi
 }
 
+act_version() {
+    value_or_na act --version |
+        sed -E 's/^act version //'
+}
+
 project_python_version() {
     local output
 
@@ -212,11 +217,15 @@ docker_compose_version() {
     row 'Ubuntu' "$(ubuntu_version)"
     row 'Bash' "$(bash_version)"
     row 'Visual Studio Code' "$(vscode_version)"
+    row 'Docker Desktop' "$(docker_desktop_version)"
+    row 'Docker CLI' "$(docker_cli_version)"
+    row 'Docker Engine' "$(docker_engine_version)"
     row 'Git' "$(git_version)"
     row 'curl' "$(curl_version)"
     row 'GNU Make' "$(make_version)"
-    row 'uv' "$(uv_version)"
     row 'ShellCheck' "$(shellcheck_version)"
+    row 'uv' "$(uv_version)"
+    row 'act' "$(act_version)"
 
     if [[ -f "$ROOT_DIR/.python-version" &&
           -f "$ROOT_DIR/pyproject.toml" ]]; then
@@ -239,12 +248,32 @@ docker_compose_version() {
 # Replace generated sections in README.md
 
 awk -v dev_file="$DEV_TABLE" -v runtime_file="$RUNTIME_TABLE" '
+function normalize(line) {
+    sub(/\r$/, "", line)
+    sub(/^[[:space:]]+/, "", line)
+
+    if (substr(line, 1, 1) == "\\") {
+        line = substr(line, 2)
+    }
+
+    return line
+}
+
+function is_blank(line) {
+    return line ~ /^[[:space:]]*$/
+}
+
 function emit_file(path, line) {
-    while ((getline line < path) > 0) print line
+    while ((getline line < path) > 0) {
+        print line
+    }
     close(path)
 }
 
 BEGIN {
+    dev_heading = "### Tested Development Environment"
+    runtime_heading = "### Tested Runtime Environment"
+
     dev_begin = "<!-- BEGIN AUTO-GENERATED: development-versions -->"
     dev_end = "<!-- END AUTO-GENERATED: development-versions -->"
 
@@ -253,53 +282,82 @@ BEGIN {
 }
 
 {
-    sub(/\r$/, "")
+    original = $0
+    marker = normalize(original)
 
-    if (skip == "dev") {
-        if ($0 == dev_end) skip = ""
+    if (skip != "") {
+        if ((skip == "dev" && marker == dev_end) ||
+            (skip == "runtime" && marker == runtime_end)) {
+            skip = ""
+            after_generated = 1
+        }
         next
     }
 
-    if (skip == "runtime") {
-        if ($0 == runtime_end) skip = ""
-        next
+    if (after_generated) {
+        if (is_blank(original)) {
+            next
+        }
+
+        if (marker == dev_begin) {
+            skip = "dev"
+            next
+        }
+
+        if (marker == runtime_begin) {
+            skip = "runtime"
+            next
+        }
+
+        print ""
+        after_generated = 0
     }
 
-    if ($0 == dev_begin) {
+    if (marker == dev_begin) {
         skip = "dev"
         next
     }
 
-    if ($0 == runtime_begin) {
+    if (marker == runtime_begin) {
         skip = "runtime"
         next
     }
 
-    if ($0 == "### Tested Development Environment") {
-        print
+    if (marker == dev_heading) {
+        print original
         print ""
         print dev_begin
+        print ""
         emit_file(dev_file)
+        print ""
         print dev_end
+
         found_dev = 1
+        after_generated = 1
         next
     }
 
-    if ($0 == "### Tested Runtime Environment") {
-        print
+    if (marker == runtime_heading) {
+        print original
         print ""
         print runtime_begin
+        print ""
         emit_file(runtime_file)
+        print ""
         print runtime_end
+
         found_runtime = 1
+        after_generated = 1
         next
     }
 
-    print
+    print original
 }
 
 END {
-    if (!found_dev || !found_runtime) exit 1
+    if (skip != "" || !found_dev || !found_runtime) {
+        exit 1
+    }
 }
 ' "$README" > "$UPDATED_README"
 

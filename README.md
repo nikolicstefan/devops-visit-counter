@@ -5,11 +5,13 @@
 ### Prerequisites
 
 - WSL2 with Ubuntu (recommended for Windows development)
+- Docker Desktop (with WSL integration)
 - Git
 - curl
 - GNU Make
+- Shellcheck
 - uv
-- shellcheck
+- act
 
 ### Installing Development Tools
 
@@ -28,21 +30,30 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 Restart the terminal or reload the shell configuration after installation.
 
+Install act:
+
+**https://nektosact.com/installation/**
+
 ### Verifying Installation
 
 ```bash
 bash --version
 code --version
+docker --version
+docker version
+docker desktop version
 git --version
 curl --version
 make --version
-uv --version
 shellcheck --version
+uv --version
+act --version
 ```
 
 ### Tested Development Environment
 
 <!-- BEGIN AUTO-GENERATED: development-versions -->
+
 | Component | Version |
 |---|---|
 | Windows | 25H2 (build 26200.9711) |
@@ -51,18 +62,18 @@ shellcheck --version
 | Ubuntu | 22.04.5 LTS |
 | Bash | 5.1.16 |
 | Visual Studio Code | 1.145.2 |
+| Docker Desktop | 4.98.0 |
+| Docker CLI | 29.9.2 |
+| Docker Engine | 29.9.2 |
 | Git | 2.34.1 |
 | curl | 7.81.0 |
 | GNU Make | 4.3 |
-| uv | 0.12.22 |
 | ShellCheck | 0.8.0 |
+| uv | 0.12.22 |
+| act | 0.2.97 |
 | Project Python | 3.13.16 |
+
 <!-- END AUTO-GENERATED: development-versions -->
-
-
-
-
-
 
 ## Runtime Environment
 
@@ -98,18 +109,15 @@ docker desktop version
 ### Tested Runtime Environment
 
 <!-- BEGIN AUTO-GENERATED: runtime-versions -->
+
 | Component | Version |
 |---|---|
 | Docker Desktop | 4.98.0 |
 | Docker CLI | 29.9.2 |
 | Docker Engine | 29.9.2 |
 | Docker Compose | 5.6.1 |
+
 <!-- END AUTO-GENERATED: runtime-versions -->
-
-
-
-
-
 
 ## Tools and AI Usage
 

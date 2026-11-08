@@ -1,16 +1,28 @@
 VERSIONS_SCRIPT := scripts/versions.sh
+CI_WORKFLOW := .github/workflows/ci.yml
 
-RUFF := uv run ruff
-MYPY := uv run mypy
+ACTIONLINT_IMAGE := rhysd/actionlint:1.7.12
+ACT_RUNNER_IMAGE := catthehacker/ubuntu:act-24.04
+
+RUFF_FMT := uv run ruff format
+RUFF_CHK := uv run ruff check
 
 .PHONY: \
 	shellcheck \
 	versions \
-	tidy \
-	tidy-imp \
+	py-format \
+	py-format-check \
+	py-lint \
+	py-lint-fix \
+	py-imports-fix \
+	py-typecheck \
+	py-test \
+	ci-lint \
+	ci-run \
+	checks \
+	formats \
 	run \
-	test \
-	pytest
+	test
 
 shellcheck:
 	@test -n $(SCRIPT) || { \
@@ -35,19 +47,54 @@ versions:
 	fi
 	$(VERSIONS_SCRIPT)
 
-tidy:
-	-$(RUFF) format .
-	-$(RUFF) check --fix -v .
-	-$(MYPY) .
+py-format:
+	$(RUFF_FMT) .
 
-tidy-imp:
-	$(RUFF) check --select I --fix -v .
+py-format-check:
+	$(RUFF_FMT) --check .
+
+py-lint:
+	$(RUFF_CHK) .
+
+py-lint-fix:
+	$(RUFF_CHK) --fix -v .
+
+py-imports-fix:
+	$(RUFF_CHK) --select I --fix -v .
+
+py-typecheck:
+	uv run mypy .
+
+py-test:
+	uv run python -m pytest
+
+ci-lint:
+	docker run --rm \
+		-v "$(CURDIR):/repo" \
+		-w /repo \
+		$(ACTIONLINT_IMAGE) \
+		-color
+
+ci-run:
+	act push \
+		-W $(CI_WORKFLOW) \
+		-j checks \
+		-P ubuntu-24.04=$(ACT_RUNNER_IMAGE)
+
+checks:
+	-$(MAKE) shellcheck SCRIPT=$(VERSIONS_SCRIPT)
+	-$(MAKE) py-format-check
+	-$(MAKE) py-lint
+	-$(MAKE) py-typecheck
+	-$(MAKE) py-test
+	-$(MAKE) ci-lint
+
+formats:
+	-$(MAKE) py-format
+	-$(MAKE) py-lint-fix
 
 run:
 	uv run uvicorn app.main:app --reload --host 127.0.0.1 --port "$${APP_PORT:-8000}"
 
 test:
 	curl http://127.0.0.1:8000/
-
-pytest:
-	uv run python -m pytest

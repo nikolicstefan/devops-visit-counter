@@ -3,6 +3,7 @@ CI_WORKFLOW := .github/workflows/ci.yml
 
 ACTIONLINT_IMAGE := rhysd/actionlint:1.7.12
 ACT_RUNNER_IMAGE := catthehacker/ubuntu:act-24.04
+HADOLINT_IMAGE := hadolint/hadolint:v2.15.1
 
 APP_IMAGE := visit-counter
 APP_HOST_PORT := 8000
@@ -22,6 +23,7 @@ RUFF_CHK := uv run ruff check
 	py-imports-fix \
 	py-typecheck \
 	py-test \
+	docker-lint \
 	ci-lint \
 	ci-run \
 	checks \
@@ -78,6 +80,9 @@ py-typecheck:
 py-test:
 	uv run python -m pytest
 
+docker-lint:
+	docker run --rm -i $(HADOLINT_IMAGE) < Dockerfile
+
 ci-lint:
 	docker run --rm \
 		-v "$(CURDIR):/repo" \
@@ -97,6 +102,7 @@ checks:
 	$(MAKE) py-lint
 	$(MAKE) py-typecheck
 	$(MAKE) py-test
+	$(MAKE) docker-lint
 	$(MAKE) ci-lint
 
 formats:

@@ -55,3 +55,6 @@ jobs:
 
       - name: Run pytest
         run: make py-test
+
+      - name: Run Hadolint
+        run: make docker-lint

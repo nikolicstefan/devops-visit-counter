@@ -8,6 +8,7 @@ RUFF_FMT := uv run ruff format
 RUFF_CHK := uv run ruff check
 
 .PHONY: \
+	history \
 	shellcheck \
 	versions \
 	py-format \
@@ -23,6 +24,9 @@ RUFF_CHK := uv run ruff check
 	formats \
 	run \
 	test
+
+history:
+	git log --oneline --graph --all --decorate
 
 shellcheck:
 	@test -n $(SCRIPT) || { \

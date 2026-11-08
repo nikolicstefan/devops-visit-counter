@@ -86,16 +86,16 @@ ci-run:
 		-P ubuntu-24.04=$(ACT_RUNNER_IMAGE)
 
 checks:
-	-$(MAKE) shellcheck SCRIPT=$(VERSIONS_SCRIPT)
-	-$(MAKE) py-format-check
-	-$(MAKE) py-lint
-	-$(MAKE) py-typecheck
-	-$(MAKE) py-test
-	-$(MAKE) ci-lint
+	$(MAKE) shellcheck SCRIPT=$(VERSIONS_SCRIPT)
+	$(MAKE) py-format-check
+	$(MAKE) py-lint
+	$(MAKE) py-typecheck
+	$(MAKE) py-test
+	$(MAKE) ci-lint
 
 formats:
-	-$(MAKE) py-format
-	-$(MAKE) py-lint-fix
+	$(MAKE) py-format
+	$(MAKE) py-lint-fix
 
 run:
 	uv run uvicorn app.main:app --reload --host 127.0.0.1 --port "$${APP_PORT:-8000}"

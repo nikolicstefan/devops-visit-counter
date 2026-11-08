@@ -4,6 +4,10 @@ CI_WORKFLOW := .github/workflows/ci.yml
 ACTIONLINT_IMAGE := rhysd/actionlint:1.7.12
 ACT_RUNNER_IMAGE := catthehacker/ubuntu:act-24.04
 
+APP_IMAGE := visit-counter
+APP_HOST_PORT := 8000
+APP_CONTAINER_PORT := 8000
+
 RUFF_FMT := uv run ruff format
 RUFF_CHK := uv run ruff check
 
@@ -23,7 +27,9 @@ RUFF_CHK := uv run ruff check
 	checks \
 	formats \
 	run \
-	test
+	test-index \
+	docker-build \
+	docker-run
 
 history:
 	git log --oneline --graph --all --decorate
@@ -98,7 +104,17 @@ formats:
 	$(MAKE) py-lint-fix
 
 run:
-	uv run uvicorn app.main:app --reload --host 127.0.0.1 --port "$${APP_PORT:-8000}"
+	uv run uvicorn app.main:app --reload --host 127.0.0.1 --port "$${APP_PORT:-$(APP_HOST_PORT)}"
 
-test:
-	curl http://127.0.0.1:8000/
+test-index:
+	curl --fail-with-body -i http://127.0.0.1:$(APP_HOST_PORT)/
+	@echo ""
+
+docker-build:
+	docker build -t $(APP_IMAGE) .
+
+docker-run:
+	docker run --rm \
+		--name $(APP_IMAGE) \
+		-p $(APP_HOST_PORT):$(APP_CONTAINER_PORT) \
+		$(APP_IMAGE)

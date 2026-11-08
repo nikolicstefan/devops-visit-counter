@@ -67,6 +67,7 @@ The workflow is defined in `.github/workflows/ci.yml`.
 6. Run Ruff linting.
 7. Run mypy type checking.
 8. Run pytest.
+9. Lint Dockerfile using Hadolint.
 
 ## Development Environment
 
@@ -192,6 +193,7 @@ The checks include:
 - Ruff linting
 - mypy type checking
 - pytest
+- Hadolint linting
 - actionlint linting
 
 ## Runtime Environment

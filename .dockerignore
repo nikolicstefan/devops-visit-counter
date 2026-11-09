@@ -23,6 +23,7 @@
 scripts/
 tests/
 .dockerignore
+compose.yaml
 Dockerfile
 Makefile
 README.md

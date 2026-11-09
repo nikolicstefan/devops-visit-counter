@@ -1,3 +1,7 @@
+RUFF_FMT := uv run ruff format
+RUFF_CHK := uv run ruff check
+COMPOSE := docker compose
+
 VERSIONS_SCRIPT := scripts/versions.sh
 CI_WORKFLOW := .github/workflows/ci.yml
 
@@ -8,9 +12,6 @@ HADOLINT_IMAGE := hadolint/hadolint:v2.15.1
 APP_IMAGE := visit-counter
 APP_HOST_PORT := 8000
 APP_CONTAINER_PORT := 8000
-
-RUFF_FMT := uv run ruff format
-RUFF_CHK := uv run ruff check
 
 .PHONY: \
 	history \
@@ -24,6 +25,7 @@ RUFF_CHK := uv run ruff check
 	py-typecheck \
 	py-test \
 	docker-lint \
+	compose-lint \
 	ci-lint \
 	ci-run \
 	checks \
@@ -31,7 +33,13 @@ RUFF_CHK := uv run ruff check
 	run \
 	test-index \
 	docker-build \
-	docker-run
+	docker-run \
+	compose-build \
+	compose-up \
+	compose-down \
+	compose-reset \
+	compose-logs \
+	compose-ps
 
 history:
 	git log --oneline --graph --all --decorate
@@ -83,6 +91,9 @@ py-test:
 docker-lint:
 	docker run --rm -i $(HADOLINT_IMAGE) < Dockerfile
 
+compose-lint:
+	$(COMPOSE) config --quiet
+
 ci-lint:
 	docker run --rm \
 		-v "$(CURDIR):/repo" \
@@ -112,10 +123,6 @@ formats:
 run:
 	uv run uvicorn app.main:app --reload --host 127.0.0.1 --port "$${APP_PORT:-$(APP_HOST_PORT)}"
 
-test-index:
-	curl --fail-with-body -i http://127.0.0.1:$(APP_HOST_PORT)/
-	@echo ""
-
 docker-build:
 	docker build -t $(APP_IMAGE) .
 
@@ -124,3 +131,26 @@ docker-run:
 		--name $(APP_IMAGE) \
 		-p $(APP_HOST_PORT):$(APP_CONTAINER_PORT) \
 		$(APP_IMAGE)
+
+compose-build:
+	$(COMPOSE) build
+
+compose-up:
+	$(COMPOSE) up -d --build
+
+compose-down:
+	$(COMPOSE) down
+
+compose-restart:
+	$(COMPOSE) down -v
+	$(MAKE) compose-up
+
+compose-logs:
+	$(COMPOSE) logs -f
+
+compose-ps:
+	$(COMPOSE) ps
+
+test-index:
+	curl --fail-with-body -i http://127.0.0.1:$(APP_HOST_PORT)/
+	@echo ""

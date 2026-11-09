@@ -3,24 +3,34 @@
 
 ## Architecture
 
-The application is organized into separate modules for HTTP application setup and route definitions.
+The application is containerized using Docker and orchestrated
+with Docker Compose.
 
 ```text
-                 HTTP Client
-                      |
-                      v
-               FastAPI Application
-                  (app/main.py)
-                      |
-               Request Logging
-                   (stdout)
-                      |
-                      v
-                  APIRouter
-                (app/router.py)
-                      |
-                      v
-                 JSON Response
+              HTTP Client
+                   |
+                   v
+             localhost:8080
+                   |
+                   v
+             Docker Compose
+                   |
+                   v
+             App Container
+                   |
+                Uvicorn
+              0.0.0.0:8000
+                   |
+                   v
+          FastAPI Application
+                   |
+                   v
+             JSON Response
+
+         Container Healthcheck
+                   |
+                   v
+                 GET /
 ```
 
 ## API
@@ -46,6 +56,100 @@ The `host` field identifies the host on which the application is running.
 
 Each HTTP request is logged to standard output (stdout).
 
+## Docker Containerization
+
+The application is packaged into a Docker image based on the official
+Python slim image.
+
+### Dockerfile
+
+The Dockerfile uses uv for dependency installation and takes advantage
+of Docker BuildKit caching.
+
+Key implementation decisions:
+
+- Python dependencies are installed before application source code
+  is copied, allowing dependency layers to be reused.
+- Dependencies are installed from the locked `uv.lock` file.
+- Development dependencies are excluded from the production image.
+- The application runs as a non-root user.
+- Python output is unbuffered to make application logs available
+  immediately through Docker.
+- The official uv image is used to provide the uv executable during
+  the build without retaining it in the final application image.
+
+### Building the Image
+
+Build the application image:
+
+```bash
+docker build -t visit-counter .
+```
+
+Run the container independently:
+
+```bash
+docker run --rm -p 8000:8000 visit-counter
+```
+
+### Running with Docker Compose
+
+Docker Compose is used to build and run the application container.
+
+Validate the Compose configuration:
+
+```bash
+docker compose config --quiet
+```
+
+Build and start the application:
+
+```bash
+docker compose up -d --build --wait --wait-timeout 60
+```
+
+Check container status:
+
+```bash
+docker compose ps --all
+```
+
+The application is available at:
+
+**http://localhost:8000/**
+
+Test the API:
+
+```bash
+curl --fail-with-body --show-error http://localhost:8000/
+```
+
+View application logs:
+
+```bash
+docker compose logs -f app
+```
+
+Stop the environment:
+
+```bash
+docker compose down --remove-orphans
+```
+
+### Compose Configuration
+
+The Compose configuration currently defines a single application service.
+
+- Host port `8000` is mapped to container port `8000`.
+- The container uses the restart policy `unless-stopped`.
+- A healthcheck periodically verifies that the application responds
+  successfully to HTTP requests.
+- The healthcheck uses Python's standard library, avoiding additional
+  packages in the production image.
+
+The application container is considered healthy when its HTTP endpoint
+responds successfully.
+
 ## CI Pipeline
 
 GitHub Actions is used for continuous integration.
@@ -66,8 +170,10 @@ The workflow is defined in `.github/workflows/ci.yml`.
 5. Check Python formatting with Ruff.
 6. Run Ruff linting.
 7. Run mypy type checking.
-8. Run pytest.
+8. Run automated tests using pytest.
 9. Lint Dockerfile using Hadolint.
+10. Validate the Docker Compose configuration.
+11.
 
 ## Development Environment
 

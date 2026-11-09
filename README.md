@@ -173,7 +173,10 @@ The workflow is defined in `.github/workflows/ci.yml`.
 8. Run automated tests using pytest.
 9. Lint Dockerfile using Hadolint.
 10. Validate the Docker Compose configuration.
-11.
+11. Build the Docker image using Docker Compose.
+12. Start the application container and wait for its healtcheck.
+13. Run an HTTP smoke test against the running application.
+14. Display container status and clean up the Compose environment.
 
 ## Development Environment
 

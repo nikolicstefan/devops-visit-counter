@@ -1,13 +1,20 @@
+RUFF_FMT := uv run ruff format
+RUFF_CHK := uv run ruff check
+COMPOSE := docker compose
+
 VERSIONS_SCRIPT := scripts/versions.sh
 CI_WORKFLOW := .github/workflows/ci.yml
 
 ACTIONLINT_IMAGE := rhysd/actionlint:1.7.12
 ACT_RUNNER_IMAGE := catthehacker/ubuntu:act-24.04
+HADOLINT_IMAGE := hadolint/hadolint:v2.15.1
 
-RUFF_FMT := uv run ruff format
-RUFF_CHK := uv run ruff check
+APP_IMAGE := visit-counter
+APP_HOST_PORT := 8000
+APP_CONTAINER_PORT := 8000
 
 .PHONY: \
+	history \
 	shellcheck \
 	versions \
 	py-format \
@@ -17,12 +24,28 @@ RUFF_CHK := uv run ruff check
 	py-imports-fix \
 	py-typecheck \
 	py-test \
+	docker-lint \
+	compose-lint \
 	ci-lint \
 	ci-run \
 	checks \
 	formats \
 	run \
-	test
+	test-index \
+	docker-build \
+	docker-run \
+	compose-build \
+	compose-up \
+	compose-up-wait \
+	compose-down \
+	compose-reset \
+	compose-logs \
+	compose-logs-app \
+	compose-ps \
+	compose-test-index
+
+history:
+	git log --oneline --graph --all --decorate
 
 shellcheck:
 	@test -n $(SCRIPT) || { \
@@ -68,6 +91,12 @@ py-typecheck:
 py-test:
 	uv run python -m pytest
 
+docker-lint:
+	docker run --rm -i $(HADOLINT_IMAGE) < Dockerfile
+
+compose-lint:
+	$(COMPOSE) config --quiet
+
 ci-lint:
 	docker run --rm \
 		-v "$(CURDIR):/repo" \
@@ -82,19 +111,64 @@ ci-run:
 		-P ubuntu-24.04=$(ACT_RUNNER_IMAGE)
 
 checks:
-	-$(MAKE) shellcheck SCRIPT=$(VERSIONS_SCRIPT)
-	-$(MAKE) py-format-check
-	-$(MAKE) py-lint
-	-$(MAKE) py-typecheck
-	-$(MAKE) py-test
-	-$(MAKE) ci-lint
+	$(MAKE) shellcheck SCRIPT=$(VERSIONS_SCRIPT)
+	$(MAKE) py-format-check
+	$(MAKE) py-lint
+	$(MAKE) py-typecheck
+	$(MAKE) py-test
+	$(MAKE) docker-lint
+	$(MAKE) compose-lint
+	$(MAKE) ci-lint
+	$(MAKE) compose-test-index
 
 formats:
-	-$(MAKE) py-format
-	-$(MAKE) py-lint-fix
+	$(MAKE) py-format
+	$(MAKE) py-lint-fix
 
 run:
-	uv run uvicorn app.main:app --reload --host 127.0.0.1 --port "$${APP_PORT:-8000}"
+	uv run uvicorn app.main:app --reload --host 127.0.0.1 --port "$${APP_PORT:-$(APP_HOST_PORT)}"
 
-test:
-	curl http://127.0.0.1:8000/
+test-index:
+	response="$$(curl --fail-with-body --silent --show-error http://127.0.0.1:$(APP_HOST_PORT)/)"; \
+	printf '%s\n' "$$response" | grep -q '"message"[[:space:]]*:[[:space:]]*"Hello DevOps"'; \
+	printf '%s\n' "$$response" | grep -qE '"host"[[:space:]]*:[[:space:]]*"[^"]+"'
+
+docker-build:
+	docker build -t $(APP_IMAGE) .
+
+docker-run:
+	docker run --rm \
+		--name $(APP_IMAGE) \
+		-p $(APP_HOST_PORT):$(APP_CONTAINER_PORT) \
+		$(APP_IMAGE)
+
+compose-build:
+	$(COMPOSE) build
+
+compose-up:
+	$(COMPOSE) up -d --build
+
+compose-up-wait:
+	$(COMPOSE) up -d --build --wait --wait-timeout 60
+
+compose-down:
+	$(COMPOSE) down --remove-orphans
+
+compose-restart:
+	$(COMPOSE) down --remove-orphans -v
+	$(MAKE) compose-up
+
+compose-logs:
+	$(COMPOSE) logs -f
+
+compose-logs-app:
+	$(COMPOSE) logs -f app
+
+compose-ps:
+	$(COMPOSE) ps --all
+
+compose-test-index:
+	@set -eu; \
+	trap '$(MAKE) compose-down' EXIT; \
+	$(MAKE) compose-up-wait; \
+	$(MAKE) test-index

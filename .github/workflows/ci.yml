@@ -55,3 +55,30 @@ jobs:
 
       - name: Run pytest
         run: make py-test
+
+      - name: Run Hadolint
+        run: make docker-lint
+
+      - name: Validate Docker Compose configuration
+        run: make compose-lint
+
+      - name: Build Docker image
+        run: make compose-build
+
+      - name: Start application and wait for healthcheck
+        run: make compose-up-wait
+
+      - name: Test index endpoint
+        run: make test-index
+
+      - name: Show Compose status
+        if: always()
+        run: make compose-ps
+
+      - name: Show application logs on failure
+        if: failure()
+        run: make compose-logs-app
+
+      - name: Stop application
+        if: always()
+        run: make compose-down

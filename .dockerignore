@@ -1,0 +1,29 @@
+# IDE
+.vscode/
+
+# Git
+.git/
+.github/
+.gitattributes
+.gitignore
+
+# Python
+.venv/
+**/__pycache__/
+**/*.py[cod]
+
+# Python Testing
+.pytest_cache/
+
+# Python Tooling
+.ruff_cache/
+.mypy_cache/
+
+# Development Files
+scripts/
+tests/
+.dockerignore
+compose.yaml
+Dockerfile
+Makefile
+README.md

@@ -162,7 +162,7 @@ compose-logs:
 	$(COMPOSE) logs -f
 
 compose-logs-app:
-	$(COMPOSE) logs app
+	$(COMPOSE) logs -f app
 
 compose-ps:
 	$(COMPOSE) ps --all

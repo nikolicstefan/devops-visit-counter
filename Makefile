@@ -6,6 +6,7 @@ RUFF_CHK := uv run ruff check
 COMPOSE := docker compose
 
 VERSIONS_SCRIPT := scripts/versions.sh
+HEALTHCHECK_SCRIPT := scripts/healthcheck.sh
 CI_WORKFLOW := .github/workflows/ci.yml
 
 ACTIONLINT_IMAGE := rhysd/actionlint:1.7.12
@@ -35,6 +36,7 @@ APP_IMAGE := visit-counter
 	test-index \
 	test-visits \
 	test-visits-persistence \
+	healthcheck \
 	docker-build \
 	docker-run \
 	compose-build \
@@ -114,7 +116,7 @@ ci-run:
 		-P ubuntu-24.04=$(ACT_RUNNER_IMAGE)
 
 run:
-	uv run uvicorn app.main:app --reload --host 127.0.0.1 --port "$${APP_PORT:-$(APP_PUBLIC_PORT)}"
+	uv run uvicorn app.main:app --reload --host $(APP_URL) --port "$${APP_PORT:-$(APP_PUBLIC_PORT)}"
 
 define TEST_INDEX_SCRIPT
 import json
@@ -128,7 +130,7 @@ endef
 export TEST_INDEX_SCRIPT
 
 test-index:
-	@response="$$(curl --fail-with-body --silent --show-error http://127.0.0.1:$(APP_PUBLIC_PORT)/)"; \
+	@response="$$(curl --fail-with-body --silent --show-error $(APP_URL):$(APP_PUBLIC_PORT)/)"; \
 	uv run python -c "$$TEST_INDEX_SCRIPT" "$$response"
 
 define TEST_VISITS_SCRIPT
@@ -145,8 +147,8 @@ endef
 export TEST_VISITS_SCRIPT
 
 test-visits:
-	@first_response="$$(curl --fail-with-body --silent --show-error http://127.0.0.1:$(APP_PUBLIC_PORT)/visits)"; \
-	second_response="$$(curl --fail-with-body --silent --show-error http://127.0.0.1:$(APP_PUBLIC_PORT)/visits)"; \
+	@first_response="$$(curl --fail-with-body --silent --show-error $(APP_URL):$(APP_PUBLIC_PORT)/visits)"; \
+	second_response="$$(curl --fail-with-body --silent --show-error $(APP_URL):$(APP_PUBLIC_PORT)/visits)"; \
 	uv run python -c "$$TEST_VISITS_SCRIPT" "$$first_response" "$$second_response"
 
 define TEST_PERSISTENCE_SCRIPT
@@ -161,8 +163,23 @@ endef
 export TEST_PERSISTENCE_SCRIPT
 
 test-visits-persistence:
-	@response="$$(curl --fail-with-body --silent --show-error http://127.0.0.1:$(APP_PUBLIC_PORT)/visits)"; \
+	@response="$$(curl --fail-with-body --silent --show-error $(APP_URL):$(APP_PUBLIC_PORT)/visits)"; \
 	uv run python -c "$$TEST_PERSISTENCE_SCRIPT" "$(SAVED_VISITS)" "$$response"
+
+healthcheck:
+	@test -f $(HEALTHCHECK_SCRIPT) || { \
+		echo "Script not found: $(HEALTHCHECK_SCRIPT)" >&2; \
+		exit 1; \
+	}
+	@if [ ! -x "$(HEALTHCHECK_SCRIPT)" ]; then \
+		echo "chmod +x $(HEALTHCHECK_SCRIPT)"; \
+		chmod +x $(HEALTHCHECK_SCRIPT); \
+	fi
+	@test -n "$(URL)" || { \
+		echo "Usage: make healthcheck URL=http://localhost:8080" >&2; \
+		exit 1; \
+	}
+	$(HEALTHCHECK_SCRIPT) "$(URL)"
 
 docker-build:
 	docker build -t $(APP_IMAGE) .
@@ -180,7 +197,7 @@ compose-up:
 	$(COMPOSE) up -d --build
 
 compose-up-wait:
-	$(COMPOSE) up -d --build --wait --wait-timeout 60
+	$(COMPOSE) up -d --build --wait
 
 compose-down:
 	$(COMPOSE) down --remove-orphans
@@ -202,15 +219,18 @@ compose-tests:
 	@set -eu; \
 	trap '$(MAKE) compose-down' EXIT; \
 	$(MAKE) compose-up-wait; \
+	$(MAKE) healthcheck URL=$(APP_URL):$(APP_PUBLIC_PORT); \
 	$(MAKE) test-index; \
 	VISITS="$$($(MAKE) --silent --no-print-directory test-visits)"; \
 	test -n "$$VISITS"; \
 	$(MAKE) compose-down; \
 	$(MAKE) compose-up-wait; \
+	$(MAKE) healthcheck URL=$(APP_URL):$(APP_PUBLIC_PORT); \
 	$(MAKE) test-visits-persistence SAVED_VISITS="$$VISITS"
 
 checks:
 	$(MAKE) shellcheck SCRIPT=$(VERSIONS_SCRIPT)
+	$(MAKE) shellcheck SCRIPT=$(HEALTHCHECK_SCRIPT)
 	$(MAKE) py-format-check
 	$(MAKE) py-lint
 	$(MAKE) py-typecheck

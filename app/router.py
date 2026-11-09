@@ -1,8 +1,10 @@
 import socket
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, status
+from fastapi.responses import JSONResponse
 from redis.asyncio import Redis
+from redis.exceptions import RedisError
 
 from .dependencies import get_redis
 
@@ -26,3 +28,16 @@ async def read_visits(redis: RedisDependency) -> dict[str, int]:
     return {
         "visits": visits,
     }
+
+
+@router.get("/health")
+async def health(redis: RedisDependency) -> JSONResponse:
+    try:
+        await redis.ping()
+    except RedisError:
+        return JSONResponse(
+            content={"status": "error"},
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    return JSONResponse(content={"status": "ok"}, status_code=status.HTTP_200_OK)

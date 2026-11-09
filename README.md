@@ -7,30 +7,27 @@ The application is containerized using Docker and orchestrated
 with Docker Compose.
 
 ```text
-              HTTP Client
-                   |
-                   v
-             localhost:8080
-                   |
-                   v
-             Docker Compose
-                   |
-                   v
-             App Container
-                   |
-                Uvicorn
-              0.0.0.0:8000
-                   |
-                   v
-          FastAPI Application
-                   |
-                   v
-             JSON Response
-
-         Container Healthcheck
-                   |
-                   v
-                 GET /
+                 HTTP Client
+                      |
+                      v
+              localhost:8080
+                      |
+                      v
+               Docker Compose
+                      |
+             +--------+--------+
+             |                 |
+             v                 v
+       FastAPI App           Redis
+       (app:8000)       (redis:6379)
+             |                 |
+             |                 v
+             |            redis-data
+             |              volume
+             |
+             v
+        Request Logging
+           (stdout)
 ```
 
 ## API
@@ -40,6 +37,7 @@ with Docker Compose.
 | Method | Endpoint | Description |
 |---|---|---|
 | GET | `/` | Returns a greeting and the application hostname |
+| GET | `/visits` | Increments and returns the persistent visit counter |
 
 #### GET /
 
@@ -52,9 +50,86 @@ Example response:
 }
 ```
 
-The `host` field identifies the host on which the application is running.
+#### GET /visits
+
+Increments the Redis-backed visit counter and returns its current value.
+
+Example response:
+
+```json
+{
+  "visits": 42
+}
+```
 
 Each HTTP request is logged to standard output (stdout).
+
+## Configuration
+
+### Environment Configuration
+
+Application configuration is managed through environment variables.
+
+The `.env.example` file provides the required configuration:
+
+| Variable | Description | Example |
+|---|---|---|
+| `APP_PORT` | Application listening port | `8000` |
+| `REDIS_HOST` | Redis service hostname | `redis` |
+| `REDIS_PORT` | Redis service port | `6379` |
+
+Create a local environment file:
+
+```bash
+cp .env.example .env
+```
+
+The `.env` file is excluded from Git. Only `.env.example` is committed.
+Environment variables are loaded and validated using Pydantic Settings.
+
+## Runtime Environment
+
+### Prerequisites
+
+- Docker Desktop (Windows/macOS), or Docker Engine and Docker Compose plugin (Linux)
+
+### Installation
+
+**Windows**
+
+Install Docker Desktop:
+
+**https://docs.docker.com/desktop/setup/install/windows-install/**
+
+Enable WSL integration for the Ubuntu distribution.
+
+**Linux**
+
+Install Docker Engine and Docker Compose plugin:
+
+**https://docs.docker.com/engine/install/**
+
+### Verifying Installation
+
+```bash
+docker --version
+docker version
+docker compose version
+docker desktop version
+```
+
+### Tested Runtime Environment
+
+<!-- BEGIN AUTO-GENERATED: runtime-versions -->
+
+| Component | Version |
+|---|---|
+| Docker Desktop | 4.98.0 |
+| Docker CLI | 29.9.2 |
+| Docker Engine | 29.9.2 |
+| Docker Compose | 5.6.1 |
+
+<!-- END AUTO-GENERATED: runtime-versions -->
 
 ## Docker Containerization
 
@@ -92,9 +167,29 @@ Run the container independently:
 docker run --rm -p 8000:8000 visit-counter
 ```
 
+### Compose Configuration
+
+The Compose configuration currently defines a single application service.
+
+- Host port `8000` is mapped to container port `8000`.
+- The container uses the restart policy `unless-stopped`.
+- A healthcheck periodically verifies that the application responds
+  successfully to HTTP requests.
+- The healthcheck uses Python's standard library, avoiding additional
+  packages in the production image.
+
+The application container is considered healthy when its HTTP endpoint
+responds successfully.
+
 ### Running with Docker Compose
 
 Docker Compose is used to build and run the application container.
+
+Make sure the environment file is created:
+
+```bash
+test -f .env
+```
 
 Validate the Compose configuration:
 
@@ -122,6 +217,7 @@ Test the API:
 
 ```bash
 curl --fail-with-body --show-error http://localhost:8000/
+curl --fail-with-body --show-error http://localhost:8000/visits/
 ```
 
 View application logs:
@@ -136,47 +232,24 @@ Stop the environment:
 docker compose down --remove-orphans
 ```
 
-### Compose Configuration
+### Redis Persistence
 
-The Compose configuration currently defines a single application service.
+Redis uses a named Docker volume and Append Only File (AOF) persistence.
 
-- Host port `8000` is mapped to container port `8000`.
-- The container uses the restart policy `unless-stopped`.
-- A healthcheck periodically verifies that the application responds
-  successfully to HTTP requests.
-- The healthcheck uses Python's standard library, avoiding additional
-  packages in the production image.
+The volume preserves counter data when containers are stopped and recreated.
 
-The application container is considered healthy when its HTTP endpoint
-responds successfully.
+To verify persistence:
 
-## CI Pipeline
+```bash
+curl --fail-with-body --show-error http://localhost:8080/visits
+docker compose down
+docker compose up -d
+curl --fail-with-body --show-error http://localhost:8080/visits
+```
 
-GitHub Actions is used for continuous integration.
+The counter continues from its previously stored value.
 
-The workflow is defined in `.github/workflows/ci.yml`.
-
-### Triggers
-
-- Push to any branch.
-- Pull requests targeting `main`.
-
-### Pipeline Checks
-
-1. Checkout repository.
-2. Set up Python and uv.
-3. Install ShellCheck and project dependencies.
-4. Validate Bash scripts using ShellCheck.
-5. Check Python formatting with Ruff.
-6. Run Ruff linting.
-7. Run mypy type checking.
-8. Run automated tests using pytest.
-9. Lint Dockerfile using Hadolint.
-10. Validate the Docker Compose configuration.
-11. Build the Docker image using Docker Compose.
-12. Start the application container and wait for its healtcheck.
-13. Run an HTTP smoke test against the running application.
-14. Display container status and clean up the Compose environment.
+**Note:** `docker compose down -v` removes named volumes and permanently deletes the stored counter data.
 
 ## Development Environment
 
@@ -305,49 +378,32 @@ The checks include:
 - Hadolint linting
 - actionlint linting
 
-## Runtime Environment
+## CI Pipeline
 
-### Prerequisites
+GitHub Actions is used for continuous integration.
 
-- Docker Desktop (Windows/macOS), or Docker Engine and Docker Compose plugin (Linux)
+The workflow is defined in `.github/workflows/ci.yml`.
 
-### Installation
+### Triggers
 
-**Windows**
+- Push to any branch.
+- Pull requests targeting `main`.
 
-Install Docker Desktop:
+### Pipeline Checks
 
-**https://docs.docker.com/desktop/setup/install/windows-install/**
-
-Enable WSL integration for the Ubuntu distribution.
-
-**Linux**
-
-Install Docker Engine and Docker Compose plugin:
-
-**https://docs.docker.com/engine/install/**
-
-### Verifying Installation
-
-```bash
-docker --version
-docker version
-docker compose version
-docker desktop version
-```
-
-### Tested Runtime Environment
-
-<!-- BEGIN AUTO-GENERATED: runtime-versions -->
-
-| Component | Version |
-|---|---|
-| Docker Desktop | 4.98.0 |
-| Docker CLI | 29.9.2 |
-| Docker Engine | 29.9.2 |
-| Docker Compose | 5.6.1 |
-
-<!-- END AUTO-GENERATED: runtime-versions -->
+1. Check out the repository.
+2. Create `.env` file from `.env.example`.
+2. Set up Python and uv.
+3. Install ShellCheck and project dependencies.
+4. Validate Bash scripts using ShellCheck.
+5. Check Python formatting with Ruff.
+6. Run Ruff linting.
+7. Run mypy type checking.
+8. Run automated tests using pytest.
+9. Lint the Dockerfile using Hadolint.
+10. Validate the Docker Compose configuration.
+11. Build the Docker image using Docker Compose.
+12. Run smoke tests.
 
 ## Tools and AI Usage
 

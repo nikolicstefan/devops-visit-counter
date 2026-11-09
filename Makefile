@@ -36,10 +36,13 @@ APP_CONTAINER_PORT := 8000
 	docker-run \
 	compose-build \
 	compose-up \
+	compose-up-wait \
 	compose-down \
 	compose-reset \
 	compose-logs \
-	compose-ps
+	compose-logs-app \
+	compose-ps \
+	compose-test-index
 
 history:
 	git log --oneline --graph --all --decorate
@@ -114,7 +117,9 @@ checks:
 	$(MAKE) py-typecheck
 	$(MAKE) py-test
 	$(MAKE) docker-lint
+	$(MAKE) compose-lint
 	$(MAKE) ci-lint
+	$(MAKE) compose-test-index
 
 formats:
 	$(MAKE) py-format
@@ -122,6 +127,11 @@ formats:
 
 run:
 	uv run uvicorn app.main:app --reload --host 127.0.0.1 --port "$${APP_PORT:-$(APP_HOST_PORT)}"
+
+test-index:
+	response="$$(curl --fail-with-body --silent --show-error http://127.0.0.1:$(APP_HOST_PORT)/)"; \
+	printf '%s\n' "$$response" | grep -q '"message"[[:space:]]*:[[:space:]]*"Hello DevOps"'; \
+	printf '%s\n' "$$response" | grep -qE '"host"[[:space:]]*:[[:space:]]*"[^"]+"'
 
 docker-build:
 	docker build -t $(APP_IMAGE) .
@@ -138,19 +148,27 @@ compose-build:
 compose-up:
 	$(COMPOSE) up -d --build
 
+compose-up-wait:
+	$(COMPOSE) up -d --build --wait --wait-timeout 60
+
 compose-down:
-	$(COMPOSE) down
+	$(COMPOSE) down --remove-orphans
 
 compose-restart:
-	$(COMPOSE) down -v
+	$(COMPOSE) down --remove-orphans -v
 	$(MAKE) compose-up
 
 compose-logs:
 	$(COMPOSE) logs -f
 
-compose-ps:
-	$(COMPOSE) ps
+compose-logs-app:
+	$(COMPOSE) logs app
 
-test-index:
-	curl --fail-with-body -i http://127.0.0.1:$(APP_HOST_PORT)/
-	@echo ""
+compose-ps:
+	$(COMPOSE) ps --all
+
+compose-test-index:
+	@set -eu; \
+	trap '$(MAKE) compose-down' EXIT; \
+	$(MAKE) compose-up-wait; \
+	$(MAKE) test-index

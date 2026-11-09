@@ -1,3 +1,6 @@
+include .env
+export
+
 RUFF_FMT := uv run ruff format
 RUFF_CHK := uv run ruff check
 COMPOSE := docker compose
@@ -10,8 +13,6 @@ ACT_RUNNER_IMAGE := catthehacker/ubuntu:act-24.04
 HADOLINT_IMAGE := hadolint/hadolint:v2.15.1
 
 APP_IMAGE := visit-counter
-APP_HOST_PORT := 8000
-APP_CONTAINER_PORT := 8000
 
 .PHONY: \
 	history \
@@ -32,6 +33,8 @@ APP_CONTAINER_PORT := 8000
 	formats \
 	run \
 	test-index \
+	test-visits \
+	test-visits-persistence \
 	docker-build \
 	docker-run \
 	compose-build \
@@ -42,7 +45,7 @@ APP_CONTAINER_PORT := 8000
 	compose-logs \
 	compose-logs-app \
 	compose-ps \
-	compose-test-index
+	compose-tests
 
 history:
 	git log --oneline --graph --all --decorate
@@ -110,28 +113,56 @@ ci-run:
 		-j checks \
 		-P ubuntu-24.04=$(ACT_RUNNER_IMAGE)
 
-checks:
-	$(MAKE) shellcheck SCRIPT=$(VERSIONS_SCRIPT)
-	$(MAKE) py-format-check
-	$(MAKE) py-lint
-	$(MAKE) py-typecheck
-	$(MAKE) py-test
-	$(MAKE) docker-lint
-	$(MAKE) compose-lint
-	$(MAKE) ci-lint
-	$(MAKE) compose-test-index
-
-formats:
-	$(MAKE) py-format
-	$(MAKE) py-lint-fix
-
 run:
-	uv run uvicorn app.main:app --reload --host 127.0.0.1 --port "$${APP_PORT:-$(APP_HOST_PORT)}"
+	uv run uvicorn app.main:app --reload --host 127.0.0.1 --port "$${APP_PORT:-$(APP_PUBLIC_PORT)}"
+
+define TEST_INDEX_SCRIPT
+import json
+import sys
+
+data = json.loads(sys.argv[1])
+
+assert data["message"] == "Hello DevOps"
+assert isinstance(data["host"], str) and data["host"]
+endef
+export TEST_INDEX_SCRIPT
 
 test-index:
-	response="$$(curl --fail-with-body --silent --show-error http://127.0.0.1:$(APP_HOST_PORT)/)"; \
-	printf '%s\n' "$$response" | grep -q '"message"[[:space:]]*:[[:space:]]*"Hello DevOps"'; \
-	printf '%s\n' "$$response" | grep -qE '"host"[[:space:]]*:[[:space:]]*"[^"]+"'
+	@response="$$(curl --fail-with-body --silent --show-error http://127.0.0.1:$(APP_PUBLIC_PORT)/)"; \
+	uv run python -c "$$TEST_INDEX_SCRIPT" "$$response"
+
+define TEST_VISITS_SCRIPT
+import json
+import sys
+
+first_visits = json.loads(sys.argv[1])["visits"]
+second_visits = json.loads(sys.argv[2])["visits"]
+
+assert second_visits == first_visits + 1, (first_visits, second_visits)
+
+print(second_visits)
+endef
+export TEST_VISITS_SCRIPT
+
+test-visits:
+	@first_response="$$(curl --fail-with-body --silent --show-error http://127.0.0.1:$(APP_PUBLIC_PORT)/visits)"; \
+	second_response="$$(curl --fail-with-body --silent --show-error http://127.0.0.1:$(APP_PUBLIC_PORT)/visits)"; \
+	uv run python -c "$$TEST_VISITS_SCRIPT" "$$first_response" "$$second_response"
+
+define TEST_PERSISTENCE_SCRIPT
+import json
+import sys
+
+saved_visits = int(sys.argv[1])
+current_visits = json.loads(sys.argv[2])["visits"]
+
+assert current_visits == saved_visits + 1, (saved_visits, current_visits)
+endef
+export TEST_PERSISTENCE_SCRIPT
+
+test-visits-persistence:
+	@response="$$(curl --fail-with-body --silent --show-error http://127.0.0.1:$(APP_PUBLIC_PORT)/visits)"; \
+	uv run python -c "$$TEST_PERSISTENCE_SCRIPT" "$(SAVED_VISITS)" "$$response"
 
 docker-build:
 	docker build -t $(APP_IMAGE) .
@@ -139,7 +170,7 @@ docker-build:
 docker-run:
 	docker run --rm \
 		--name $(APP_IMAGE) \
-		-p $(APP_HOST_PORT):$(APP_CONTAINER_PORT) \
+		-p $(APP_PUBLIC_PORT):$(APP_PORT) \
 		$(APP_IMAGE)
 
 compose-build:
@@ -154,7 +185,7 @@ compose-up-wait:
 compose-down:
 	$(COMPOSE) down --remove-orphans
 
-compose-restart:
+compose-reset:
 	$(COMPOSE) down --remove-orphans -v
 	$(MAKE) compose-up
 
@@ -167,8 +198,29 @@ compose-logs-app:
 compose-ps:
 	$(COMPOSE) ps --all
 
-compose-test-index:
+compose-tests:
 	@set -eu; \
 	trap '$(MAKE) compose-down' EXIT; \
 	$(MAKE) compose-up-wait; \
-	$(MAKE) test-index
+	$(MAKE) test-index; \
+	VISITS="$$($(MAKE) --silent --no-print-directory test-visits)"; \
+	test -n "$$VISITS"; \
+	$(MAKE) compose-down; \
+	$(MAKE) compose-up-wait; \
+	$(MAKE) test-visits-persistence SAVED_VISITS="$$VISITS"
+
+checks:
+	$(MAKE) shellcheck SCRIPT=$(VERSIONS_SCRIPT)
+	$(MAKE) py-format-check
+	$(MAKE) py-lint
+	$(MAKE) py-typecheck
+	$(MAKE) py-test
+	$(MAKE) docker-lint
+	$(MAKE) compose-lint
+	$(MAKE) ci-lint
+	$(MAKE) compose-tests
+
+formats:
+	$(MAKE) py-format
+	$(MAKE) py-lint-fix
+	$(MAKE) py-typecheck

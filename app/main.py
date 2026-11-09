@@ -1,10 +1,12 @@
 import logging
 import sys
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response, status
 from fastapi.responses import JSONResponse
 
+from .redis import create_redis
 from .router import router
 
 logger = logging.getLogger(name=__name__)
@@ -19,7 +21,20 @@ if not logger.handlers:
 
 logger.propagate = False
 
-app = FastAPI(title="Visit Counter")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+    redis = create_redis()
+
+    app.state.redis = redis
+
+    try:
+        yield
+    finally:
+        await redis.aclose()
+
+
+app = FastAPI(title="Visit Counter", lifespan=lifespan)
 app.include_router(router=router)
 
 

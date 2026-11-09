@@ -1,21 +1,51 @@
 services:
+  redis:
+    image: redis:8.10.3-alpine3.23
+
+    command: ["redis-server", "--appendonly", "yes"]
+
+    networks:
+      - app-net
+
+    volumes:
+      - redis-data:/data
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
   app:
     build:
       context: .
       dockerfile: Dockerfile
 
+    env_file:
+      - .env
+
     ports:
-      - 8000:8000
+      - ${APP_PUBLIC_PORT:-8000}:${APP_PORT:-8000}
+
+    networks:
+      - app-net
+
+    depends_on:
+      redis:
+        condition: service_healthy
 
     restart: unless-stopped
 
     healthcheck:
-      test:
-        - CMD
-        - python
-        - -c
-        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=2)"
+      test: ["CMD", python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=2)"]
       interval: 30s
       timeout: 3s
       retries: 3
       start_period: 5s
+
+networks:
+  app-net:
+
+volumes:
+  redis-data:

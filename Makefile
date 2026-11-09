@@ -13,8 +13,6 @@ ACT_RUNNER_IMAGE := catthehacker/ubuntu:act-24.04
 HADOLINT_IMAGE := hadolint/hadolint:v2.15.1
 
 APP_IMAGE := visit-counter
-APP_HOST_PORT := $(APP_PORT)
-APP_CONTAINER_PORT := $(APP_PORT)
 
 .PHONY: \
 	history \
@@ -130,10 +128,10 @@ formats:
 	$(MAKE) py-typecheck
 
 run:
-	uv run uvicorn app.main:app --reload --host 127.0.0.1 --port "$${APP_PORT:-$(APP_HOST_PORT)}"
+	uv run uvicorn app.main:app --reload --host 127.0.0.1 --port "$${APP_PORT:-$(APP_PUBLIC_PORT)}"
 
 test-index:
-	response="$$(curl --fail-with-body --silent --show-error http://127.0.0.1:$(APP_HOST_PORT)/)"; \
+	response="$$(curl --fail-with-body --silent --show-error http://127.0.0.1:$(APP_PUBLIC_PORT)/)"; \
 	printf '%s\n' "$$response" | grep -q '"message"[[:space:]]*:[[:space:]]*"Hello DevOps"'; \
 	printf '%s\n' "$$response" | grep -qE '"host"[[:space:]]*:[[:space:]]*"[^"]+"'
 
@@ -143,7 +141,7 @@ docker-build:
 docker-run:
 	docker run --rm \
 		--name $(APP_IMAGE) \
-		-p $(APP_HOST_PORT):$(APP_CONTAINER_PORT) \
+		-p $(APP_PUBLIC_PORT):$(APP_PORT) \
 		$(APP_IMAGE)
 
 compose-build:

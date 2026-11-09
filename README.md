@@ -1,6 +1,12 @@
 # Visit Counter
 [![CI](https://github.com/nikolicstefan/devops-visit-counter/actions/workflows/ci.yml/badge.svg)](https://github.com/nikolicstefan/devops-visit-counter/actions/workflows/ci.yml)
 
+A lightweight containerized web application built with FastAPI and Redis
+that tracks visits using an atomic counter. The project demonstrates
+Docker containerization, persistent storage, environment-based
+configuration, automated testing, and continuous integration with
+GitHub Actions.
+
 ## Architecture
 
 The application is containerized using Docker and orchestrated
@@ -10,7 +16,7 @@ with Docker Compose.
                  HTTP Client
                       |
                       v
-              localhost:8080
+              localhost:8000
                       |
                       v
                Docker Compose
@@ -38,6 +44,7 @@ with Docker Compose.
 |---|---|---|
 | GET | `/` | Returns a greeting and the application hostname |
 | GET | `/visits` | Increments and returns the persistent visit counter |
+| GET | `/health` | Checks application availability and Redis connectivity |
 
 #### GET /
 
@@ -62,7 +69,52 @@ Example response:
 }
 ```
 
+### GET /health
+
+Checks whether Redis is reachable.
+
+Successful response (HTTP 200):
+
+```json
+{
+  "status": "ok"
+}
+```
+
+Failure response (HTTP 503):
+
+```json
+{
+  "status": "error"
+}
+```
+
 Each HTTP request is logged to standard output (stdout).
+
+## Healthcheck Script
+
+The project includes a Bash script that periodically checks the
+application's `/health` endpoint.
+
+The script accepts the application base URL:
+
+```bash
+./scripts/healthcheck.sh http://localhost:8000
+```
+
+The script:
+
+- Performs up to five HTTP requests.
+- Waits three seconds between unsuccessful attempts.
+- Logs each attempt with a timestamp and HTTP status code.
+- Exits with status code 0 when the application is healthy.
+- Exits with status code 1 when the application remains unhealthy.
+
+The script can also be executed through Make:
+
+```bash
+make healthcheck URL=http://localhost:8000
+```
 
 ## Configuration
 
@@ -241,10 +293,10 @@ The volume preserves counter data when containers are stopped and recreated.
 To verify persistence:
 
 ```bash
-curl --fail-with-body --show-error http://localhost:8080/visits
+curl --fail-with-body --show-error http://localhost:8000/visits
 docker compose down
 docker compose up -d
-curl --fail-with-body --show-error http://localhost:8080/visits
+curl --fail-with-body --show-error http://localhost:8000/visits
 ```
 
 The counter continues from its previously stored value.

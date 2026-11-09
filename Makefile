@@ -1,3 +1,6 @@
+include .env
+export
+
 RUFF_FMT := uv run ruff format
 RUFF_CHK := uv run ruff check
 COMPOSE := docker compose
@@ -10,8 +13,8 @@ ACT_RUNNER_IMAGE := catthehacker/ubuntu:act-24.04
 HADOLINT_IMAGE := hadolint/hadolint:v2.15.1
 
 APP_IMAGE := visit-counter
-APP_HOST_PORT := 8000
-APP_CONTAINER_PORT := 8000
+APP_HOST_PORT := $(APP_PORT)
+APP_CONTAINER_PORT := $(APP_PORT)
 
 .PHONY: \
 	history \
@@ -124,6 +127,7 @@ checks:
 formats:
 	$(MAKE) py-format
 	$(MAKE) py-lint-fix
+	$(MAKE) py-typecheck
 
 run:
 	uv run uvicorn app.main:app --reload --host 127.0.0.1 --port "$${APP_PORT:-$(APP_HOST_PORT)}"

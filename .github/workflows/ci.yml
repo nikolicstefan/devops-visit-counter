@@ -45,7 +45,9 @@ jobs:
         run: uv sync --locked --dev
 
       - name: Check Bash scripts
-        run: make shellcheck SCRIPT=scripts/versions.sh
+        run: |
+          make shellcheck SCRIPT=scripts/versions.sh
+          make shellcheck SCRIPT=scripts/healthcheck.sh
 
       - name: Check Ruff formatting
         run: make py-format-check

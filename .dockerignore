@@ -18,6 +18,11 @@
 # Python Tooling
 .ruff_cache/
 .mypy_cache/
+.python-version
+
+# Environment
+.env
+.env.*
 
 # Development Files
 scripts/

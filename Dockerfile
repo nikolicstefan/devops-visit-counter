@@ -22,6 +22,9 @@ COPY app/ ./app/
 
 USER 10001
 
-EXPOSE 8000
+ARG APP_PORT=8000
+ENV APP_PORT=${APP_PORT}
 
-CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+EXPOSE ${APP_PORT}
+
+CMD ["sh", "-c", "exec python -m uvicorn app.main:app --host 0.0.0.0 --port ${APP_PORT}"]

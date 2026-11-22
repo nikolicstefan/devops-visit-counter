@@ -16,7 +16,7 @@ with Docker Compose.
                  HTTP Client
                       |
                       v
-              localhost:8000
+               127.0.0.1:8080
                       |
                       v
                Docker Compose
@@ -99,7 +99,7 @@ application's `/health` endpoint.
 The script accepts the application base URL:
 
 ```bash
-./scripts/healthcheck.sh http://localhost:8000
+./scripts/healthcheck.sh http://127.0.0.1:8080
 ```
 
 The script:
@@ -113,7 +113,7 @@ The script:
 The script can also be executed through Make:
 
 ```bash
-make healthcheck URL=http://localhost:8000
+make healthcheck URL=http://127.0.0.1:8080
 ```
 
 ## Configuration
@@ -126,7 +126,9 @@ The `.env.example` file provides the required configuration:
 
 | Variable | Description | Example |
 |---|---|---|
-| `APP_PORT` | Application listening port | `8000` |
+| `APP_HOST` | Application host address | `127.0.0.1` |
+| `APP_PORT` | Application internal container listening port | `8000` |
+| `APP_PUBLIC_PORT` | Application exposed host port | `8080` |
 | `REDIS_HOST` | Redis service hostname | `redis` |
 | `REDIS_PORT` | Redis service port | `6379` |
 
@@ -216,14 +218,14 @@ docker build -t visit-counter .
 Run the container independently:
 
 ```bash
-docker run --rm -p 8000:8000 visit-counter
+docker run --rm -p 8080:8000 visit-counter
 ```
 
 ### Compose Configuration
 
 The Compose configuration currently defines a single application service.
 
-- Host port `8000` is mapped to container port `8000`.
+- Host port `8080` is mapped to container port `8000`.
 - The container uses the restart policy `unless-stopped`.
 - A healthcheck periodically verifies that the application responds
   successfully to HTTP requests.
@@ -263,13 +265,13 @@ docker compose ps --all
 
 The application is available at:
 
-**http://localhost:8000/**
+**http://127.0.0.1:8080/**
 
 Test the API:
 
 ```bash
-curl --fail-with-body --show-error http://localhost:8000/
-curl --fail-with-body --show-error http://localhost:8000/visits/
+curl --fail-with-body --show-error http://127.0.0.1:8080/
+curl --fail-with-body --show-error http://127.0.0.1:8080/visits
 ```
 
 View application logs:
@@ -293,10 +295,10 @@ The volume preserves counter data when containers are stopped and recreated.
 To verify persistence:
 
 ```bash
-curl --fail-with-body --show-error http://localhost:8000/visits
+curl --fail-with-body --show-error http://127.0.0.1:8080/visits
 docker compose down
 docker compose up -d
-curl --fail-with-body --show-error http://localhost:8000/visits
+curl --fail-with-body --show-error http://127.0.0.1:8080/visits
 ```
 
 The counter continues from its previously stored value.
@@ -397,12 +399,12 @@ Dependencies are declared in `pyproject.toml` and locked in `uv.lock`.
 Start the development server:
 
 ```bash
-make run
+make uvicorn-run
 ```
 
 The application is available at:
 
-http://127.0.0.1:8000/
+**http://127.0.0.1:8080/**
 
 ### Code Quality and Testing
 

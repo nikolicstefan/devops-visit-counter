@@ -1,15 +1,9 @@
 # syntax=docker/dockerfile:1
 
-FROM python:3.13.18-slim
+# Build stage
+FROM python:3.13.18-alpine AS builder
 
 WORKDIR /app
-
-RUN useradd --create-home --uid 10001 --user-group --shell /usr/sbin/nologin app
-
-ENV PATH="/app/.venv/bin:$PATH" \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONFAULTHANDLER=1 \
-    PYTHONUNBUFFERED=1
 
 RUN --mount=from=ghcr.io/astral-sh/uv:0.12.22,source=/uv,target=/bin/uv \
     --mount=type=cache,target=/root/.cache/uv \
@@ -19,6 +13,22 @@ RUN --mount=from=ghcr.io/astral-sh/uv:0.12.22,source=/uv,target=/bin/uv \
     uv sync --locked --no-dev --no-install-project
 
 COPY app/ ./app/
+
+# Runtime stage
+FROM python:3.13.18-alpine AS runtime
+
+WORKDIR /app
+
+RUN addgroup -g 10001 -S app && \
+    adduser -u 10001 -S app -G app -s /sbin/nologin
+
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONFAULTHANDLER=1 \
+    PYTHONUNBUFFERED=1
+
+COPY --from=builder --chown=10001:10001 /app/.venv /app/.venv
+COPY --from=builder --chown=10001:10001 /app/app /app/app
 
 USER 10001
 

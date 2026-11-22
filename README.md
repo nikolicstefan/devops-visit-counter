@@ -464,3 +464,12 @@ The workflow is defined in `.github/workflows/ci.yml`.
 ## Tools and AI Usage
 
 **ChatGPT**, **Gemini** and **Claude** are used for technical explanations, architectural discussions, documentation, and troubleshooting.
+
+## Notes
+
+### Multi-stage Docker build
+
+| Build Type | Image Size |
+| :--- | :--- |
+| **Single-stage Build** | 134.42 MiB |
+| **Multi-stage Build** | 65.90 MiB |

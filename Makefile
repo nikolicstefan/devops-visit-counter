@@ -30,6 +30,7 @@ ACT_RUNNER_IMAGE := catthehacker/ubuntu:act-24.04
 HADOLINT_IMAGE := hadolint/hadolint:v2.15.1
 REDIS_IMAGE := redis:8.10.3-alpine3.23
 APP_IMAGE := $(APP_NAME)
+APP_IMAGE_LATEST := $(APP_IMAGE):latest
 
 VERSIONS_SCRIPT_PATH := scripts/versions.sh
 HEALTHCHECK_SCRIPT_PATH := scripts/healthcheck.sh
@@ -66,6 +67,7 @@ export
 	docker-network-rm \
 	docker-volume-rm \
 	docker-build \
+	docker-image-size \
 	docker-run \
 	docker-stop \
 	docker-rm \
@@ -248,6 +250,15 @@ docker-build:
 		--build-arg APP_PORT=$(APP_PORT) \
 		--tag $(APP_IMAGE) \
 		.
+
+docker-image-size:
+	docker image inspect \
+		$(APP_IMAGE_LATEST) \
+		--format '{{.Size}}' \
+	| \
+	numfmt \
+		--to=iec \
+		--format="%.2f"
 
 docker-run:
 ifeq ($(SERVICE),app)

@@ -15,25 +15,36 @@ APP_URL := http://$(APP_HOST)
 APP_NAME := visit-counter
 REDIS_NAME := redis
 
-DOCKER_APP_NETWORK := app-net
-DOCKER_REDIS_VOLUME := redis-data
+APP_NETWORK_NAME := app-net
+REDIS_VOLUME_NAME := redis-data
+REDIS_VOLUME := "$(REDIS_VOLUME_NAME):/data"
+CHECKMAKE_WORKDIR := /
+CHECKMAKE_VOLUME := "$(CURDIR)/Makefile:/Makefile:ro"
+CHECKMAKE_INI_VOLUME := "$(CURDIR)/checkmake.ini:/checkmake.ini:ro"
+ACTIONLINT_WORKDIR := /repo
+ACTIONLINT_VOLUME := "$(CURDIR):$(ACTIONLINT_WORKDIR)"
 
-VERSIONS_SCRIPT := scripts/versions.sh
-HEALTHCHECK_SCRIPT := scripts/healthcheck.sh
-CI_WORKFLOW := .github/workflows/ci.yml
-
+CHECKMAKE_IMAGE := quay.io/checkmake/checkmake:v0.3.2
 ACTIONLINT_IMAGE := rhysd/actionlint:1.7.12
 ACT_RUNNER_IMAGE := catthehacker/ubuntu:act-24.04
 HADOLINT_IMAGE := hadolint/hadolint:v2.15.1
 REDIS_IMAGE := redis:8.10.3-alpine3.23
 APP_IMAGE := $(APP_NAME)
 
+VERSIONS_SCRIPT_PATH := scripts/versions.sh
+HEALTHCHECK_SCRIPT_PATH := scripts/healthcheck.sh
+CI_WORKFLOW_PATH := .github/workflows/ci.yml
+
+SERVICE ?=
+
 export
 
 .PHONY: \
 	history \
-	shellcheck \
 	versions \
+	check \
+	dry-run \
+	shell-check \
 	py-format \
 	py-format-check \
 	py-lint \
@@ -43,6 +54,7 @@ export
 	py-test \
 	docker-lint \
 	compose-lint \
+	compose-config \
 	ci-lint \
 	ci-run \
 	uvicorn-run \
@@ -76,28 +88,38 @@ export
 history:
 	git log --oneline --graph --all --decorate
 
-shellcheck:
-	@test -n $(SCRIPT) || { \
-		echo "Usage: make shellcheck SCRIPT=path/to/script.sh" >&2; \
+versions:
+	@test -f "$(VERSIONS_SCRIPT_PATH)" || { \
+		echo "Script not found: $(VERSIONS_SCRIPT_PATH)" >&2; \
 		exit 1; \
 	}
-	@test -f $(SCRIPT) || { \
+	@if [ ! -x "$(VERSIONS_SCRIPT_PATH)" ]; then \
+		echo "chmod +x $(VERSIONS_SCRIPT_PATH)"; \
+		chmod +x "$(VERSIONS_SCRIPT_PATH)"; \
+	fi
+	"$(VERSIONS_SCRIPT_PATH)"
+
+check:
+	docker run --rm \
+		--volume $(CHECKMAKE_VOLUME) \
+		--volume $(CHECKMAKE_INI_VOLUME) \
+		--workdir $(CHECKMAKE_WORKDIR) \
+		$(CHECKMAKE_IMAGE)
+
+dry-run:
+	$(MAKE) --dry-run --warn-undefined-variables history > /dev/null
+
+shell-check:
+	@test -n "$(SCRIPT)" || { \
+		echo "Usage: make shell-check SCRIPT=path/to/script.sh" >&2; \
+		exit 1; \
+	}
+	@test -f "$(SCRIPT)" || { \
 		echo "Script not found: $(SCRIPT)" >&2; \
 		exit 1; \
 	}
-	bash -n $(SCRIPT)
-	shellcheck $(SCRIPT)
-
-versions:
-	@test -f $(VERSIONS_SCRIPT) || { \
-		echo "Script not found: $(VERSIONS_SCRIPT)" >&2; \
-		exit 1; \
-	}
-	@if [ ! -x "$(VERSIONS_SCRIPT)" ]; then \
-		echo "chmod +x $(VERSIONS_SCRIPT)"; \
-		chmod +x $(VERSIONS_SCRIPT); \
-	fi
-	$(VERSIONS_SCRIPT)
+	bash -n "$(SCRIPT)"
+	shellcheck "$(SCRIPT)"
 
 py-format:
 	$(RUFF_FMT) .
@@ -125,18 +147,21 @@ docker-lint:
 		$(HADOLINT_IMAGE) < Dockerfile
 
 compose-lint:
+	uv run compose-lint
+
+compose-config:
 	$(COMPOSE) config --quiet
 
 ci-lint:
 	docker run --rm \
-		--volume "$(CURDIR):/repo" \
-		--workdir /repo \
+		--volume $(ACTIONLINT_VOLUME) \
+		--workdir $(ACTIONLINT_WORKDIR) \
 		$(ACTIONLINT_IMAGE) \
 		-color
 
 ci-run:
 	act push \
-		-W $(CI_WORKFLOW) \
+		-W $(CI_WORKFLOW_PATH) \
 		-j checks \
 		-P ubuntu-24.04=$(ACT_RUNNER_IMAGE)
 
@@ -195,28 +220,28 @@ test-visits-persistence:
 	uv run python -c "$$TEST_PERSISTENCE_SCRIPT" "$(SAVED_VISITS)" "$$response"
 
 healthcheck:
-	@test -f $(HEALTHCHECK_SCRIPT) || { \
-		echo "Script not found: $(HEALTHCHECK_SCRIPT)" >&2; \
+	@test -f "$(HEALTHCHECK_SCRIPT_PATH)" || { \
+		echo "Script not found: $(HEALTHCHECK_SCRIPT_PATH)" >&2; \
 		exit 1; \
 	}
-	@if [ ! -x "$(HEALTHCHECK_SCRIPT)" ]; then \
-		echo "chmod +x $(HEALTHCHECK_SCRIPT)"; \
-		chmod +x $(HEALTHCHECK_SCRIPT); \
+	@if [ ! -x "$(HEALTHCHECK_SCRIPT_PATH)" ]; then \
+		echo "chmod +x $(HEALTHCHECK_SCRIPT_PATH)"; \
+		chmod +x $(HEALTHCHECK_SCRIPT_PATH); \
 	fi
 	@test -n "$(URL)" || { \
 		echo "Usage: make healthcheck URL=http://127.0.0.1:8080" >&2; \
 		exit 1; \
 	}
-	$(HEALTHCHECK_SCRIPT) "$(URL)"
+	"$(HEALTHCHECK_SCRIPT_PATH)" "$(URL)"
 
 docker-network-create:
-	docker network create $(DOCKER_APP_NETWORK)
+	docker network create $(APP_NETWORK_NAME)
 
 docker-network-rm:
-	docker network rm $(DOCKER_APP_NETWORK)
+	docker network rm $(APP_NETWORK_NAME)
 
 docker-volume-rm:
-	docker volume rm $(DOCKER_REDIS_VOLUME)
+	docker volume rm $(REDIS_VOLUME_NAME)
 
 docker-build:
 	docker build \
@@ -230,14 +255,14 @@ ifeq ($(SERVICE),app)
 	docker run --detach \
 		--name $(APP_NAME) \
 		--env-file .env \
-		--network $(DOCKER_APP_NETWORK) \
+		--network $(APP_NETWORK_NAME) \
 		--publish $(APP_PUBLIC_PORT):$(APP_PORT) \
 		$(APP_IMAGE)
 else ifeq ($(SERVICE),redis)
 	docker run --detach \
 		--name $(REDIS_NAME) \
-		--network $(DOCKER_APP_NETWORK) \
-		--volume $(DOCKER_REDIS_VOLUME):/data \
+		--network $(APP_NETWORK_NAME) \
+		--volume $(REDIS_VOLUME) \
 		$(REDIS_IMAGE) \
 		redis-server --appendonly yes
 else
@@ -300,18 +325,21 @@ compose-tests:
 	test -n "$$VISITS"; \
 	$(MAKE) compose-down; \
 	$(MAKE) compose-up-wait; \
-	$(MAKE) healthcheck URL=$(APP_URL):$(APP_PUBLIC_PORT); \
+	$(MAKE) healthcheck URL="$(APP_URL):$(APP_PUBLIC_PORT)"; \
 	$(MAKE) test-visits-persistence SAVED_VISITS="$$VISITS"
 
 checks:
-	$(MAKE) shellcheck SCRIPT=$(VERSIONS_SCRIPT)
-	$(MAKE) shellcheck SCRIPT=$(HEALTHCHECK_SCRIPT)
+	$(MAKE) check
+	$(MAKE) dry-run
+	$(MAKE) shell-check SCRIPT=$(VERSIONS_SCRIPT_PATH)
+	$(MAKE) shell-check SCRIPT=$(HEALTHCHECK_SCRIPT_PATH)
 	$(MAKE) py-format-check
 	$(MAKE) py-lint
 	$(MAKE) py-typecheck
 	$(MAKE) py-test
 	$(MAKE) docker-lint
 	$(MAKE) compose-lint
+	$(MAKE) compose-config
 	$(MAKE) ci-lint
 	$(MAKE) compose-tests
 

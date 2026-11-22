@@ -44,10 +44,15 @@ jobs:
       - name: Install project dependencies
         run: uv sync --locked --dev
 
+      - name: Check Makefile
+        run: |
+          make check
+          make dry-run
+
       - name: Check Bash scripts
         run: |
-          make shellcheck SCRIPT=scripts/versions.sh
-          make shellcheck SCRIPT=scripts/healthcheck.sh
+          make shell-check SCRIPT=scripts/versions.sh
+          make shell-check SCRIPT=scripts/healthcheck.sh
 
       - name: Check Ruff formatting
         run: make py-format-check
@@ -61,11 +66,14 @@ jobs:
       - name: Run pytest
         run: make py-test
 
-      - name: Run Hadolint
+      - name: Check Dockerfile
         run: make docker-lint
 
-      - name: Validate Docker Compose configuration
+      - name: Check Docker Compose configuration
         run: make compose-lint
+
+      - name: Validate Docker Compose configuration
+        run: make compose-config
 
       - name: Build Docker image
         run: make compose-build

@@ -408,8 +408,6 @@ The application is available at:
 
 ### Code Quality and Testing
 
-The project uses Ruff for linting and formatting, mypy for static type checking, and pytest for automated testing.
-
 Format the source code:
 
 ```bash
@@ -424,13 +422,15 @@ make checks
 
 The checks include:
 
-- Bash syntax validation and ShellCheck
+- Makefile checking
+- Bash scripts checking
 - Ruff formatting validation
 - Ruff linting
 - mypy type checking
 - pytest
-- Hadolint linting
-- actionlint linting
+- Dockerfile linting
+- compose.yaml linting
+- ci.yml linting
 
 ## CI Pipeline
 
@@ -447,17 +447,19 @@ The workflow is defined in `.github/workflows/ci.yml`.
 
 1. Check out the repository.
 2. Create `.env` file from `.env.example`.
-2. Set up Python and uv.
-3. Install ShellCheck and project dependencies.
-4. Validate Bash scripts using ShellCheck.
-5. Check Python formatting with Ruff.
-6. Run Ruff linting.
-7. Run mypy type checking.
-8. Run automated tests using pytest.
-9. Lint the Dockerfile using Hadolint.
-10. Validate the Docker Compose configuration.
-11. Build the Docker image using Docker Compose.
-12. Run smoke tests.
+3. Set up Python and uv.
+4. Install ShellCheck and project dependencies.
+5. Run Makefile checking.
+6. Run Bash scripts checking.
+7. Check Python formatting with Ruff.
+8. Run Ruff linting.
+9. Run mypy type checking.
+10. Run automated tests using pytest.
+11. Lint the Dockerfile using Hadolint.
+12. Lint the Docker Compose configuration using compose-lint.
+13. Validate the Docker Compose configuration.
+14. Build the Docker image using Docker Compose.
+15. Run smoke tests.
 
 ## Tools and AI Usage
 

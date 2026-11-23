@@ -34,6 +34,7 @@ APP_IMAGE_LATEST := $(APP_IMAGE):latest
 
 VERSIONS_SCRIPT_PATH := scripts/versions.sh
 HEALTHCHECK_SCRIPT_PATH := scripts/healthcheck.sh
+K8S_MANIFEST_PATH := kubernetes.yaml
 CI_WORKFLOW_PATH := .github/workflows/ci.yml
 
 SERVICE ?=
@@ -80,6 +81,14 @@ export
 	compose-logs-app \
 	compose-ps \
 	compose-tests \
+	k8s-build \
+	k8s-up \
+	k8s-down \
+	k8s-reset \
+	k8s-status \
+	k8s-logs \
+	k8s-port-forward \
+	k8s-tests \
 	checks \
 	formats \
 	build \
@@ -338,6 +347,45 @@ compose-tests:
 	$(MAKE) compose-up-wait; \
 	$(MAKE) healthcheck URL="$(APP_URL):$(APP_PUBLIC_PORT)"; \
 	$(MAKE) test-visits-persistence SAVED_VISITS="$$VISITS"
+
+k8s-build:
+	$(MAKE) docker-build
+
+k8s-up:
+	$(MAKE) k8s-build
+	kubectl apply -f $(K8S_MANIFEST_PATH)
+	kubectl rollout restart deployment/visit-counter
+	kubectl rollout status deployment/redis --timeout=120s
+	kubectl rollout status deployment/visit-counter --timeout=120s
+
+k8s-down:
+	kubectl delete \
+		configmap/visit-counter \
+		deployment/visit-counter \
+		service/visit-counter \
+		deployment/redis \
+		service/redis \
+		--ignore-not-found=true
+
+k8s-reset:
+	$(MAKE) k8s-down
+	$(MAKE) k8s-up
+
+k8s-status:
+	kubectl get deployments,pods,services
+
+k8s-logs:
+	kubectl logs deployment/visit-counter --follow --tail=100
+
+k8s-port-forward:
+	kubectl port-forward \
+		service/visit-counter \
+		$(APP_PUBLIC_PORT):$(APP_PORT)
+
+k8s-tests:
+	$(MAKE) healthcheck URL=$(APP_URL):$(APP_PUBLIC_PORT)
+	$(MAKE) test-index
+	$(MAKE) test-visits
 
 checks:
 	$(MAKE) check

@@ -178,10 +178,10 @@ docker desktop version
 
 | Component | Version |
 |---|---|
-| Docker Desktop | 4.98.0 |
-| Docker CLI | 29.9.2 |
-| Docker Engine | 29.9.2 |
-| Docker Compose | 5.6.1 |
+| Docker Desktop | 4.100.0 |
+| Docker CLI | 29.9.3 |
+| Docker Engine | 29.9.3 |
+| Docker Compose | 5.7.1 |
 
 <!-- END AUTO-GENERATED: runtime-versions -->
 
@@ -361,15 +361,15 @@ act --version
 
 | Component | Version |
 |---|---|
-| Windows | 25H2 (build 26200.9711) |
-| WSL | 2.1.5.0 |
-| WSL Kernel | 5.15.146.1 |
+| Windows | 25H2 (build 26200.9974) |
+| WSL | 3.0.5.0 |
+| WSL Kernel | 6.18.58.1 |
 | Ubuntu | 22.04.5 LTS |
 | Bash | 5.1.16 |
-| Visual Studio Code | 1.145.2 |
-| Docker Desktop | 4.98.0 |
-| Docker CLI | 29.9.2 |
-| Docker Engine | 29.9.2 |
+| Visual Studio Code | 1.147.0 |
+| Docker Desktop | 4.100.0 |
+| Docker CLI | 29.9.3 |
+| Docker Engine | 29.9.3 |
 | Git | 2.34.1 |
 | curl | 7.81.0 |
 | GNU Make | 4.3 |

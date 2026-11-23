@@ -82,6 +82,7 @@ export
 	compose-ps \
 	compose-tests \
 	k8s-build \
+	k8s-config \
 	k8s-up \
 	k8s-down \
 	k8s-reset \
@@ -351,8 +352,17 @@ compose-tests:
 k8s-build:
 	$(MAKE) docker-build
 
+k8s-config:
+	kubectl create configmap visit-counter \
+		--from-env-file=.env \
+		--dry-run=client \
+		-o yaml \
+	| \
+	kubectl apply -f -
+
 k8s-up:
 	$(MAKE) k8s-build
+	$(MAKE) k8s-config
 	kubectl apply -f $(K8S_MANIFEST_PATH)
 	kubectl rollout restart deployment/visit-counter
 	kubectl rollout status deployment/redis --timeout=120s
@@ -369,10 +379,13 @@ k8s-down:
 
 k8s-reset:
 	$(MAKE) k8s-down
+	kubectl delete \
+		pvc/redis-data \
+		--ignore-not-found=true
 	$(MAKE) k8s-up
 
 k8s-status:
-	kubectl get deployments,pods,services
+	kubectl get deployments,pods,services,pvc
 
 k8s-logs:
 	kubectl logs deployment/visit-counter --follow --tail=100
@@ -380,12 +393,21 @@ k8s-logs:
 k8s-port-forward:
 	kubectl port-forward \
 		service/visit-counter \
-		$(APP_PUBLIC_PORT):$(APP_PORT)
+		$(APP_PUBLIC_PORT):$(APP_PORT) \
+		> /dev/null 2>&1 &
 
 k8s-tests:
-	$(MAKE) healthcheck URL=$(APP_URL):$(APP_PUBLIC_PORT)
-	$(MAKE) test-index
-	$(MAKE) test-visits
+	@set -eu; \
+	trap '$(MAKE) compose-down' EXIT; \
+	$(MAKE) k8s-up; \
+	$(MAKE) k8s-port-forward; \
+	$(MAKE) healthcheck URL=$(APP_URL):$(APP_PUBLIC_PORT); \
+	$(MAKE) test-index; \
+	VISITS="$$($(MAKE) --silent --no-print-directory test-visits)"; \
+	test -n "$$VISITS"; \
+	kubectl delete pod -l app=redis; \
+	kubectl rollout status deployment/redis; \
+	$(MAKE) test-visits-persistence SAVED_VISITS="$$VISITS"
 
 checks:
 	$(MAKE) check
